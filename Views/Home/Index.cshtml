@@ -1,0 +1,104 @@
+﻿@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="container mt-5">
+
+   
+    <!-- HERO SECTION -->
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold">EventEase Venue Booking System</h1>
+        <p class="lead">
+            Manage venues, organize events, and handle bookings in one centralized platform.
+        </p>
+    </div>
+
+    <!-- DASHBOARD STATISTICS -->
+    <div class="row text-center mb-5">
+
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2>@ViewBag.TotalVenues</h2>
+                    <p>Total Venues</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2>@ViewBag.TotalEvents</h2>
+                    <p>Total Events</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2>@ViewBag.TotalBookings</h2>
+                    <p>Total Bookings</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- QUICK ACTION BUTTONS -->
+    <div class="text-center mb-5">
+
+        <a asp-controller="Venue" asp-action="Index" class="btn btn-primary btn-lg m-2">
+            View Venues
+        </a>
+
+        <a asp-controller="Event" asp-action="Index" class="btn btn-success btn-lg m-2">
+            View Events
+        </a>
+
+        <a asp-controller="Booking" asp-action="Index" class="btn btn-warning btn-lg m-2">
+            Manage Bookings
+        </a>
+
+    </div>
+
+    <!-- FEATURE CARDS -->
+    <div class="row text-center">
+
+        <div class="col-md-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Venue Management</h5>
+                    <p class="card-text">
+                        Add and manage venues including location, capacity, and venue images.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Event Scheduling</h5>
+                    <p class="card-text">
+                        Create events with start and end dates and manage event details easily.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Smart Booking</h5>
+                    <p class="card-text">
+                        Prevent double bookings and manage venue reservations efficiently.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+   
+
+</div>
