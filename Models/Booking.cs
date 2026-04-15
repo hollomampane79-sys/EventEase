@@ -1,5 +1,7 @@
 ﻿namespace EventEase.Models
 {
+
+    //this is the booking models
     public class Booking
     {
         public int BookingId { get; set; }
