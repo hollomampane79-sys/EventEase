@@ -21,23 +21,22 @@ namespace EventEase.Controllers
         // GET: Event
         public async Task<IActionResult> Index()
         {
+            // Show error messages from blocked deletions
+            if (TempData["ErrorMessage"] != null)
+                ViewBag.ErrorMessage = TempData["ErrorMessage"];
+
             return View(await _context.Events.ToListAsync());
         }
 
         // GET: Event/Details/5
         public async Task<IActionResult> Details(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var @event = await _context.Events
                 .FirstOrDefaultAsync(m => m.EventId == id);
-            if (@event == null)
-            {
-                return NotFound();
-            }
+
+            if (@event == null) return NotFound();
 
             return View(@event);
         }
@@ -49,53 +48,67 @@ namespace EventEase.Controllers
         }
 
         // POST: Event/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("EventId,Name,Description,StartDate,EndDate,CreatedAt")] Event @event)
         {
-            // Validate date before saving
+            // Validate: End date cannot be before start date
             if (@event.EndDate < @event.StartDate)
             {
-                ModelState.AddModelError("", "End date cannot be earlier than start date.");
+                ModelState.AddModelError("EndDate", "End date cannot be earlier than the start date.");
+            }
+
+            // Validate: Start date cannot be in the past
+            if (@event.StartDate < DateTime.Today)
+            {
+                ModelState.AddModelError("StartDate", "Start date cannot be in the past.");
+            }
+
+            // Validate: Name is required
+            if (string.IsNullOrWhiteSpace(@event.Name))
+            {
+                ModelState.AddModelError("Name", "Event name is required.");
             }
 
             if (ModelState.IsValid)
             {
+                @event.CreatedAt = DateTime.Now;
                 _context.Add(@event);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
+
             return View(@event);
         }
 
         // GET: Event/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var @event = await _context.Events.FindAsync(id);
-            if (@event == null)
-            {
-                return NotFound();
-            }
+            if (@event == null) return NotFound();
+
             return View(@event);
         }
 
         // POST: Event/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("EventId,Name,Description,StartDate,EndDate,CreatedAt")] Event @event)
         {
-            if (id != @event.EventId)
+            if (id != @event.EventId) return NotFound();
+
+            // Validate: End date cannot be before start date
+            if (@event.EndDate < @event.StartDate)
             {
-                return NotFound();
+                ModelState.AddModelError("EndDate", "End date cannot be earlier than the start date.");
+            }
+
+            // Validate: Name is required
+            if (string.IsNullOrWhiteSpace(@event.Name))
+            {
+                ModelState.AddModelError("Name", "Event name is required.");
             }
 
             if (ModelState.IsValid)
@@ -107,33 +120,34 @@ namespace EventEase.Controllers
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!EventExists(@event.EventId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    if (!EventExists(@event.EventId)) return NotFound();
+                    else throw;
                 }
+
                 return RedirectToAction(nameof(Index));
             }
+
             return View(@event);
         }
 
         // GET: Event/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var @event = await _context.Events
                 .FirstOrDefaultAsync(m => m.EventId == id);
-            if (@event == null)
+
+            if (@event == null) return NotFound();
+
+            // Warn user if this event has bookings
+            var hasBookings = await _context.Bookings
+                .AnyAsync(b => b.EventId == id);
+
+            if (hasBookings)
             {
-                return NotFound();
+                ViewBag.HasBookings = true;
+                ViewBag.Warning = "This event has active bookings and cannot be deleted.";
             }
 
             return View(@event);
@@ -144,13 +158,23 @@ namespace EventEase.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
+            // Block deletion if event has active bookings
+            var hasBookings = await _context.Bookings
+                .AnyAsync(b => b.EventId == id);
+
+            if (hasBookings)
+            {
+                TempData["ErrorMessage"] = "Cannot delete this event because it has existing bookings.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var @event = await _context.Events.FindAsync(id);
             if (@event != null)
             {
                 _context.Events.Remove(@event);
+                await _context.SaveChangesAsync();
             }
 
-            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
