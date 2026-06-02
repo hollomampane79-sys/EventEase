@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using EventEase.Models;
@@ -19,13 +15,39 @@ namespace EventEase.Controllers
         }
 
         // GET: Event
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? eventTypeId, DateTime? startDate, DateTime? endDate, bool? availableOnly)
         {
-            // Show error messages from blocked deletions
             if (TempData["ErrorMessage"] != null)
                 ViewBag.ErrorMessage = TempData["ErrorMessage"];
 
-            return View(await _context.Events.ToListAsync());
+            // Populate EventType dropdown for the filter UI
+            ViewBag.EventTypeId = new SelectList(_context.EventTypes, "EventTypeId", "Name", eventTypeId);
+            ViewBag.CurrentEventTypeId = eventTypeId;
+            ViewBag.CurrentStartDate = startDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentEndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.AvailableOnly = availableOnly ?? false;
+
+            var events = _context.Events
+                .Include(e => e.EventType)
+                .Include(e => e.Bookings)
+                .AsQueryable();
+
+            // Filter by EventType
+            if (eventTypeId.HasValue)
+                events = events.Where(e => e.EventTypeId == eventTypeId.Value);
+
+            // Filter by date range
+            if (startDate.HasValue)
+                events = events.Where(e => e.StartDate >= startDate.Value);
+
+            if (endDate.HasValue)
+                events = events.Where(e => e.EndDate <= endDate.Value);
+
+            // Filter: only events with no bookings (venue availability)
+            if (availableOnly == true)
+                events = events.Where(e => !e.Bookings!.Any());
+
+            return View(await events.ToListAsync());
         }
 
         // GET: Event/Details/5
@@ -34,6 +56,7 @@ namespace EventEase.Controllers
             if (id == null) return NotFound();
 
             var @event = await _context.Events
+                .Include(e => e.EventType)
                 .FirstOrDefaultAsync(m => m.EventId == id);
 
             if (@event == null) return NotFound();
@@ -44,31 +67,23 @@ namespace EventEase.Controllers
         // GET: Event/Create
         public IActionResult Create()
         {
+            ViewData["EventTypeId"] = new SelectList(_context.EventTypes, "EventTypeId", "Name");
             return View();
         }
 
         // POST: Event/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("EventId,Name,Description,StartDate,EndDate,CreatedAt")] Event @event)
+        public async Task<IActionResult> Create([Bind("EventId,Name,Description,StartDate,EndDate,CreatedAt,EventTypeId")] Event @event)
         {
-            // Validate: End date cannot be before start date
             if (@event.EndDate < @event.StartDate)
-            {
                 ModelState.AddModelError("EndDate", "End date cannot be earlier than the start date.");
-            }
 
-            // Validate: Start date cannot be in the past
             if (@event.StartDate < DateTime.Today)
-            {
                 ModelState.AddModelError("StartDate", "Start date cannot be in the past.");
-            }
 
-            // Validate: Name is required
             if (string.IsNullOrWhiteSpace(@event.Name))
-            {
                 ModelState.AddModelError("Name", "Event name is required.");
-            }
 
             if (ModelState.IsValid)
             {
@@ -78,6 +93,7 @@ namespace EventEase.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            ViewData["EventTypeId"] = new SelectList(_context.EventTypes, "EventTypeId", "Name", @event.EventTypeId);
             return View(@event);
         }
 
@@ -89,27 +105,22 @@ namespace EventEase.Controllers
             var @event = await _context.Events.FindAsync(id);
             if (@event == null) return NotFound();
 
+            ViewData["EventTypeId"] = new SelectList(_context.EventTypes, "EventTypeId", "Name", @event.EventTypeId);
             return View(@event);
         }
 
         // POST: Event/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("EventId,Name,Description,StartDate,EndDate,CreatedAt")] Event @event)
+        public async Task<IActionResult> Edit(int id, [Bind("EventId,Name,Description,StartDate,EndDate,CreatedAt,EventTypeId")] Event @event)
         {
             if (id != @event.EventId) return NotFound();
 
-            // Validate: End date cannot be before start date
             if (@event.EndDate < @event.StartDate)
-            {
                 ModelState.AddModelError("EndDate", "End date cannot be earlier than the start date.");
-            }
 
-            // Validate: Name is required
             if (string.IsNullOrWhiteSpace(@event.Name))
-            {
                 ModelState.AddModelError("Name", "Event name is required.");
-            }
 
             if (ModelState.IsValid)
             {
@@ -127,6 +138,7 @@ namespace EventEase.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
+            ViewData["EventTypeId"] = new SelectList(_context.EventTypes, "EventTypeId", "Name", @event.EventTypeId);
             return View(@event);
         }
 
@@ -136,14 +148,12 @@ namespace EventEase.Controllers
             if (id == null) return NotFound();
 
             var @event = await _context.Events
+                .Include(e => e.EventType)
                 .FirstOrDefaultAsync(m => m.EventId == id);
 
             if (@event == null) return NotFound();
 
-            // Warn user if this event has bookings
-            var hasBookings = await _context.Bookings
-                .AnyAsync(b => b.EventId == id);
-
+            var hasBookings = await _context.Bookings.AnyAsync(b => b.EventId == id);
             if (hasBookings)
             {
                 ViewBag.HasBookings = true;
@@ -158,10 +168,7 @@ namespace EventEase.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            // Block deletion if event has active bookings
-            var hasBookings = await _context.Bookings
-                .AnyAsync(b => b.EventId == id);
-
+            var hasBookings = await _context.Bookings.AnyAsync(b => b.EventId == id);
             if (hasBookings)
             {
                 TempData["ErrorMessage"] = "Cannot delete this event because it has existing bookings.";
